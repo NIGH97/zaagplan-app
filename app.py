@@ -16,7 +16,7 @@ if "stukken" not in st.session_state:
 
 # Input velden
 st.subheader("Voeg stuk toe")
-col1, col2, col3 = st.columns([2,1,2])
+col1, col2, col3 = st.columns([2,1,1])
 with col1:
     raamnummer = st.text_input("Raamnummer")
 with col2:
@@ -28,12 +28,22 @@ with col3:
         else:
             st.session_state.stukken.append({"raam": raamnummer, "lengte": lengte_mm})
 
-# Toon ingevoerde stukken en mogelijkheid tot aanpassen
+# Toon ingevoerde stukken en mogelijkheid tot aanpassen/verwijderen
 if st.session_state.stukken:
-    st.subheader("Ingevoerde stukken")
-    df = pd.DataFrame(st.session_state.stukken)
-    edited_df = st.experimental_data_editor(df, num_rows="dynamic")
-    st.session_state.stukken = edited_df.to_dict(orient="records")
+    st.subheader("Ingevoerde stukken (aanpasbaar)")
+    for i, stuk in enumerate(st.session_state.stukken):
+        col1, col2, col3 = st.columns([2,1,1])
+        with col1:
+            raam = st.text_input(f"Raamnummer {i+1}", value=stuk["raam"], key=f"raam_{i}")
+        with col2:
+            lengte = st.number_input(f"Lengte (mm) {i+1}", min_value=1, value=stuk["lengte"], key=f"lengte_{i}")
+        with col3:
+            if st.button(f"❌ Verwijder {i+1}", key=f"verwijder_{i}"):
+                st.session_state.stukken.pop(i)
+                st.experimental_rerun()
+        # update de waarden
+        st.session_state.stukken[i]["raam"] = raam
+        st.session_state.stukken[i]["lengte"] = lengte
 
 # Profielkeuze (standaard beide)
 profiel_opties = ["5 m", "7 m", "Beide"]
@@ -62,9 +72,9 @@ def optimaliseer(stukken, profielen):
 # Uitvoering
 if st.session_state.stukken:
     if keuze == "5 m":
-        profielen = [5]
+        profielen = [5,]
     elif keuze == "7 m":
-        profielen = [7]
+        profielen = [7,]
     else:
         profielen = [5,7]
 
