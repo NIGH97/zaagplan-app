@@ -50,7 +50,6 @@ if st.button("✅ Bereken Zaagplan"):
     profielen = []  # lijst van dicts: {"lengte": mm, "stukken": [stuks]}
 
     for stuk in stukken_sorted:
-        # zoek bestaand profiel waar stuk past
         geplaatst = False
         for profiel in profielen:
             if sum(s['lengte'] for s in profiel['stukken']) + stuk['lengte'] <= profiel['lengte']:
@@ -58,7 +57,6 @@ if st.button("✅ Bereken Zaagplan"):
                 geplaatst = True
                 break
         if not geplaatst:
-            # kies profiel (5m=5000mm, 7m=7000mm) dat minst restafval geeft
             opties = [5000, 7000]
             best_choice = min(opties, key=lambda x: x - stuk['lengte'])
             profielen.append({'lengte': best_choice, 'stukken': [stuk]})
@@ -70,7 +68,8 @@ if st.button("✅ Bereken Zaagplan"):
 
     for i, profiel in enumerate(profielen, start=1):
         rest = profiel['lengte'] - sum(s['lengte'] for s in profiel['stukken'])
-        st.write(f"Profiel {i} ({profiel['lengte']} mm): {[{'Raam': s['raam'], 'Lengte': s['lengte']} for s in profiel['stukken']]} → Rest: {rest} mm")
+        weergave_stukken = [f"{{{s['raam']},{s['lengte']}}}" for s in profiel['stukken']]
+        st.write(f"Profiel {i} ({profiel['lengte']} mm): {weergave_stukken} → Rest: {rest} mm")
         if profiel['lengte'] == 5000:
             totaal_5m += 1
         else:
@@ -98,7 +97,8 @@ if st.button("✅ Bereken Zaagplan"):
         y = height - 100
         for i, profiel in enumerate(profielen, start=1):
             rest = profiel['lengte'] - sum(s['lengte'] for s in profiel['stukken'])
-            lijn = f"Profiel {i} ({profiel['lengte']} mm): {[{'Raam': s['raam'], 'Lengte': s['lengte']} for s in profiel['stukken']]} → Rest: {rest} mm"
+            weergave_stukken = [f"{{{s['raam']},{s['lengte']}}}" for s in profiel['stukken']]
+            lijn = f"Profiel {i} ({profiel['lengte']} mm): {weergave_stukken} → Rest: {rest} mm"
             c.drawString(50, y, lijn)
             y -= 20
             if y < 50:
@@ -121,3 +121,4 @@ if st.button("✅ Bereken Zaagplan"):
         file_name=bestandsnaam,
         mime="application/pdf"
     )
+
