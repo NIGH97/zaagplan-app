@@ -41,61 +41,51 @@ if st.session_state.stukken:
             if st.button(f"❌ Verwijder {i+1}", key=f"verwijder_{i}"):
                 st.session_state.stukken.pop(i)
                 st.experimental_rerun()
-        # update de waarden
         st.session_state.stukken[i]["raam"] = raam
         st.session_state.stukken[i]["lengte"] = lengte
 
-# Profielkeuze (standaard beide)
-profiel_opties = ["5 m", "7 m", "Beide"]
-keuze = st.radio("Kies welke profielen te gebruiken", profiel_opties, index=2)
-
-# Optimalisatie functie
-def optimaliseer(stukken, profielen):
-    stukken_sorted = sorted(stukken, key=lambda x: x['lengte'], reverse=True)
-    resultaat = []
+# Optimalisatie
+if st.button("✅ Bereken Zaagplan"):
+    stukken_sorted = sorted(st.session_state.stukken, key=lambda x: x['lengte'], reverse=True)
+    profielen = []  # lijst van dicts: {"lengte": mm, "stukken": [stuks]}
 
     for stuk in stukken_sorted:
+        # zoek bestaand profiel waar stuk past
         geplaatst = False
-        for profiel in resultaat:
+        for profiel in profielen:
             if sum(s['lengte'] for s in profiel['stukken']) + stuk['lengte'] <= profiel['lengte']:
                 profiel['stukken'].append(stuk)
                 geplaatst = True
                 break
         if not geplaatst:
-            mogelijke = [p for p in profielen if p*1000 >= stuk['lengte']]
-            if not mogelijke:
-                continue
-            lengte_profiel = min(mogelijke)*1000  # in mm
-            resultaat.append({"lengte": lengte_profiel, "stukken": [stuk]})
-    return resultaat
+            # kies profiel (5m=5000mm, 7m=7000mm) dat minst restafval geeft
+            opties = [5000, 7000]
+            best_choice = min(opties, key=lambda x: x - stuk['lengte'])
+            profielen.append({'lengte': best_choice, 'stukken': [stuk]})
 
-# Uitvoering
-if st.session_state.stukken:
-    if keuze == "5 m":
-        profielen = [5,]
-    elif keuze == "7 m":
-        profielen = [7,]
-    else:
-        profielen = [5,7]
-
-    plan = optimaliseer(st.session_state.stukken, profielen)
-
+    # Output zaagplan
     st.subheader("Zaagplan")
-    totaal_profielen = len(plan)
-    totaal_lengte = sum(p['lengte'] for p in plan)
-    gebruikt = sum(sum(s['lengte'] for s in p['stukken']) for p in plan)
+    totaal_5m = totaal_7m = 0
+    totaal_lengte = gebruikt = 0
+
+    for i, profiel in enumerate(profielen, start=1):
+        rest = profiel['lengte'] - sum(s['lengte'] for s in profiel['stukken'])
+        st.write(f"Profiel {i} ({profiel['lengte']} mm): {[{'Raam': s['raam'], 'Lengte': s['lengte']} for s in profiel['stukken']]} → Rest: {rest} mm")
+        if profiel['lengte'] == 5000:
+            totaal_5m += 1
+        else:
+            totaal_7m += 1
+        totaal_lengte += profiel['lengte']
+        gebruikt += sum(s['lengte'] for s in profiel['stukken'])
+
     afval = totaal_lengte - gebruikt
     afval_pct = afval / totaal_lengte * 100 if totaal_lengte > 0 else 0
 
-    for i, profiel in enumerate(plan, start=1):
-        rest = profiel['lengte'] - sum(s['lengte'] for s in profiel['stukken'])
-        st.write(f"Profiel {i} ({profiel['lengte']} mm): {[{'Raam': s['raam'], 'Lengte': s['lengte']} for s in profiel['stukken']]} → Rest: {rest} mm")
-
-    st.markdown(f"**Totaal profielen nodig:** {totaal_profielen}")
+    st.markdown(f"**Totaal profielen nodig:** 5 m: {totaal_5m}, 7 m: {totaal_7m}")
     st.markdown(f"**Totale afval:** {afval} mm ({afval_pct:.1f}%)")
 
     # PDF export
-    def create_pdf(plan, afval, afval_pct, project_naam):
+    def create_pdf(profielen, totaal_5m, totaal_7m, afval, afval_pct, project_naam):
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         width, height = A4
@@ -106,7 +96,7 @@ if st.session_state.stukken:
         c.setFont("Helvetica", 10)
 
         y = height - 100
-        for i, profiel in enumerate(plan, start=1):
+        for i, profiel in enumerate(profielen, start=1):
             rest = profiel['lengte'] - sum(s['lengte'] for s in profiel['stukken'])
             lijn = f"Profiel {i} ({profiel['lengte']} mm): {[{'Raam': s['raam'], 'Lengte': s['lengte']} for s in profiel['stukken']]} → Rest: {rest} mm"
             c.drawString(50, y, lijn)
@@ -115,13 +105,14 @@ if st.session_state.stukken:
                 c.showPage()
                 y = height - 50
 
-        c.drawString(50, y-40, f"Totale afval: {afval} mm ({afval_pct:.1f}%)")
+        c.drawString(50, y-40, f"Totaal profielen: 5 m: {totaal_5m}, 7 m: {totaal_7m}")
+        c.drawString(50, y-60, f"Totale afval: {afval} mm ({afval_pct:.1f}%)")
 
         c.save()
         buffer.seek(0)
         return buffer
 
-    pdf_buffer = create_pdf(plan, afval, afval_pct, project_naam)
+    pdf_buffer = create_pdf(profielen, totaal_5m, totaal_7m, afval, afval_pct, project_naam)
     datum_bestand = datetime.now().strftime("%y%m%d")
     bestandsnaam = f"{datum_bestand} - {project_naam} - Optimalisatie.pdf"
     st.download_button(
